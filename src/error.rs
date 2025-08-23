@@ -1,7 +1,11 @@
+use axum::response::IntoResponse;
+use axum::http::StatusCode;
+use axum::response::Response;
+
 pub type Result<T> = core::result::Result<T, Error>;
 
-#[derive(debug)]
-pub enum Errro{
+#[derive(Debug)]
+pub enum Error{
     LoginFail,
 }
 

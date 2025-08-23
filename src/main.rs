@@ -3,16 +3,19 @@ use tokio::net::TcpListener;
 use axum::{Router, routing::get, response::Html, response::IntoResponse, extract::Query, extract::Path};
 use tower_http::services::ServeDir;
 use axum::routing::get_service;
-
+use axum::response::Response;
+use axum::middleware;
 pub use self::error::{Error, Result};
 mod error;
 
-mod web
+mod web;
+
 #[tokio::main]
 async fn main(){
     let routes_all: Router = Router::new()
         .merge(routes_hello())
         .merge(web::routes_login::routes())
+        .layer(middleware::map_response(main_response_mapper))
         .fallback_service(routes_static()); 
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
@@ -31,6 +34,12 @@ fn routes_hello() -> Router {
 #[derive(Debug, Deserialize)]
 struct HelloResponse {
     name : Option<String>,
+}
+
+async fn main_response_mapper(res: Response) -> Response {
+    println!("->> {:<12} - main_response_mapper", "HANDLER");
+    println!();
+    res
 }
 
 async fn handler_hello(Query(params): Query<HelloResponse>) -> impl IntoResponse {
