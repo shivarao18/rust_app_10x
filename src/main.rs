@@ -12,6 +12,7 @@ mod web
 async fn main(){
     let routes_all: Router = Router::new()
         .merge(routes_hello())
+        .merge(web::routes_login::routes())
         .fallback_service(routes_static()); 
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
