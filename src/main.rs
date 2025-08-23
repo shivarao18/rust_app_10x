@@ -1,10 +1,17 @@
 use serde::Deserialize;
 use tokio::net::TcpListener;
 use axum::{Router, routing::get, response::Html, response::IntoResponse, extract::Query, extract::Path};
+use tower_http::services::ServeDir;
+use axum::routing::get_service;
+
+pub use self::error::{Error, Result};
+mod error;
+
+mod web
 #[tokio::main]
 async fn main(){
     let routes_all: Router = Router::new()
-        .merge(routes_hello());
+        .merge(routes_hello())
         .fallback_service(routes_static()); 
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
