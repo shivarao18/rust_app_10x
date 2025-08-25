@@ -6,9 +6,11 @@ use axum::routing::get_service;
 use axum::response::Response;
 use axum::middleware;
 pub use self::error::{Error, Result};
+use tower_cookies::CookieManagerLayer;
 mod error;
 
 mod web;
+mod model;
 
 #[tokio::main]
 async fn main(){
@@ -16,6 +18,7 @@ async fn main(){
         .merge(routes_hello())
         .merge(web::routes_login::routes())
         .layer(middleware::map_response(main_response_mapper))
+        .layer(CookieManagerLayer::new())
         .fallback_service(routes_static()); 
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
