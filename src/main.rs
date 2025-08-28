@@ -1,69 +1,50 @@
-use serde::Deserialize;
-use tokio::net::TcpListener;
-use axum::{Router, routing::get, response::Html, response::IntoResponse, extract::Query, extract::Path};
-use tower_http::services::ServeDir;
-use axum::routing::get_service;
-use axum::response::Response;
-use axum::middleware;
-pub use self::error::{Error, Result};
-use tower_cookies::CookieManagerLayer;
-mod error;
+#![allow(unused)] // For early development.
 
-mod web;
+// region:    --- Modules
+
+mod ctx;
+mod error;
+mod log;
 mod model;
+mod web;
+
+pub use self::error::{Error, Result};
+
+use crate::model::ModelManager;
+use crate::web::mw_auth::mw_ctx_resolve;
+use crate::web::mw_res_map::mw_reponse_map;
+use crate::web::{routes_login, routes_static};
+use axum::{middleware, Router};
+use std::net::SocketAddr;
+use tower_cookies::CookieManagerLayer;
+
+// endregion: --- Modules
 
 #[tokio::main]
-async fn main(){
+async fn main() -> Result<()> {
+	// Initialize ModelManager.
+	let mm = ModelManager::new().await?;
 
-    let mc = ModelController::new().await?;
+	// -- Define Routes
+	// let routes_rpc = rpc::routes(mm.clone())
+	//   .route_layer(middleware::from_fn(mw_ctx_require));
 
-    let routes_api = web::routes_tickets::routes(mc.clone())
-        .route_layer(middleware::from_fn(web::mw_auth::mw_require_auth));
-    
-    let routes_all: Router = Router::new()
-        .merge(routes_hello())
-        .merge(web::routes_login::routes())
-        .layer(middleware::map_response(main_response_mapper))
-        .layer(CookieManagerLayer::new())
-        .fallback_service(routes_static()); 
+	let routes_all = Router::new()
+		.merge(routes_login::routes())
+		// .nest("/api", routes_rpc)
+		.layer(middleware::map_response(mw_reponse_map))
+		.layer(middleware::from_fn_with_state(mm.clone(), mw_ctx_resolve))
+		.layer(CookieManagerLayer::new())
+		.fallback_service(routes_static::serve_dir());
 
-    let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
-	println!("->> LISTENING on {:?}\n", listener.local_addr());
-	axum::serve(listener, routes_all.into_make_service())
+	// region:    --- Start Server
+	let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+	println!("->> {:<12} - {addr}\n", "LISTENING");
+	axum::Server::bind(&addr)
+		.serve(routes_all.into_make_service())
 		.await
 		.unwrap();
-}
+	// endregion: --- Start Server
 
-fn routes_hello() -> Router {
-    Router::new()
-        .route("/hello", get(handler_hello))
-        .route("/hello2/:name", get(handler_hello2))
-}
-
-#[derive(Debug, Deserialize)]
-struct HelloResponse {
-    name : Option<String>,
-}
-
-async fn main_response_mapper(res: Response) -> Response {
-    println!("->> {:<12} - main_response_mapper", "HANDLER");
-    println!();
-    res
-}
-
-async fn handler_hello(Query(params): Query<HelloResponse>) -> impl IntoResponse {
-    println!("->> {:<12} - handler_hello - {params:?}", "HANDLER");
-
-	let name = params.name.as_deref().unwrap_or("World!");
-	Html(format!("Hello <strong>{name}</strong>"))
-}
-
-async fn handler_hello2(Path(name): Path<String>) -> impl IntoResponse {
-	println!("->> {:<12} - handler_hello2 - {name:?}", "HANDLER");
-
-	Html(format!("Hello2 <strong>{name}</strong>"))
-}
-
-fn routes_static() -> Router {
-    Router::new().nest_service("/", get_service(ServeDir::new("./")))
+	Ok(())
 }
