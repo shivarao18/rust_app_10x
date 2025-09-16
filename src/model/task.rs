@@ -19,6 +19,7 @@ pub struct TaskForCreate {
 #[derive(Deserialize)]
 pub struct TaskForUpdate {
 	pub title: Option<String>,
+	
 }
 // endregion: --- Task Types
 
